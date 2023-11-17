@@ -11,6 +11,7 @@ ssh localhost 2022
 ```
 git clone https://github.com/format37/terminal.git
 cd terminal
+python3 -m pip install -r requirements.txt
 ```
 ### Test repo
 ```
