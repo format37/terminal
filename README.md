@@ -5,7 +5,7 @@ sudo systemctl start sshd
 ```
 ### Test sshd
 ```
-ssh localhost 2022
+ssh localhost -p 2022
 ```
 ### Install repo
 ```
