@@ -34,14 +34,19 @@ def ssh_session(hostname, port, username, password):
     channel.close()
     client.close()
 
-# Replace with the appropriate hostname, port, username, password, and command
-# input address
-hostname = input("Enter address (localhost): ")
-# input port
-port = input("Enter port (2022): ")
-# input username
-username = input("Enter username: ")
-# input password
-password = input("Enter password: ")
 
-ssh_session(hostname, port, username, password)
+def main():
+    # Replace with the appropriate hostname, port, username, password, and command
+    # input address
+    hostname = input("Enter address (localhost): ")
+    # input port
+    port = input("Enter port (2022): ")
+    # input username
+    username = input("Enter username: ")
+    # input password
+    password = input("Enter password: ")
+
+    ssh_session(hostname, port, username, password)
+
+if __name__ == '__main__':
+    main()

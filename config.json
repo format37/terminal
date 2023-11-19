@@ -1,0 +1,17 @@
+{
+    "ssh":{
+        "address":"localhost",
+        "port":2022,
+        "username":"alex",
+        "password":"pass",
+        "sleep":2
+    },
+    "openai":{
+        "proxy":{
+            "address":"localhost",
+            "port":4714
+            },
+        "api_key":"api_key",
+        "model":"gpt-4-1106-preview"
+    }
+}
