@@ -4,6 +4,7 @@ import requests
 import json
 import datetime
 import os
+import sys
 
 def token_counter(text, model, address, port):
     url = f'http://{address}:{port}/token_counter'
@@ -11,7 +12,7 @@ def token_counter(text, model, address, port):
         "text": text,
         "model": model
     }
-    print('Token counter data:', data)
+    # print('Token counter data:', data)
     response = requests.post(url, json=data)
     return response
 
@@ -46,7 +47,14 @@ def save_message(prompt):
 
 def main():
     # Read config from json
-    with open('config.json', 'r') as f:
+    if len(sys.argv) > 1:
+        # Iterate over the arguments (excluding the script name)
+        for i, arg in enumerate(sys.argv[1:]):
+            print(f"Argument {i+1}: {arg}")
+        config_filename = sys.argv[1]
+    else:
+        config_filename = 'config.json'
+    with open(config_filename, 'r') as f:
         config = json.load(f)
 
     # Starting the SSH session
@@ -78,18 +86,18 @@ def main():
     # Read system text from txt file
     with open('system.txt', 'r') as f:
         system_text = f.read()
+    system_text += f"\nuser login: {username}"
+    system_text += f"\nuser password: {password}"
 
     prompt = [
         {"role": "system", "content": system_text}
     ]
 
-    assistant_message = "user:"          
+    assistant_message = "user:"
 
     while True:
-
-        # if assistant_message starts from user:
-        if assistant_message.startswith('ssh:'):
-            command = assistant_message[4:]
+        if 'command' in assistant_message:
+            command = assistant_message['command']
             if command.lower() == 'exit':
                 ssh_response = "Session closed."
                 break
@@ -98,22 +106,13 @@ def main():
                 ssh_response = "Command interrupted."
             else:
                 ssh_response = send_command(command, config)
-            print(f'SSH response: {ssh_response}')
-            prompt.append({"role": "user", "content": f"ssh answer: {ssh_response}"})
-        elif assistant_message.startswith('wait:'):
-            # Extract the count of seconds to wait
-            seconds = int(assistant_message[5:])
-            # Wait for the specified amount of seconds
-            print(f"Waiting for {seconds} seconds...")
-            time.sleep(seconds)
-            print("Waiting done.")
-            assistant_message = "ssh::"
-            continue
-
+            print(f'bash: {ssh_response}')
+            prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
         else:
             user_text = input("Enter your message: ")
             prompt.append({"role": "user", "content": user_text})
 
+        # Calling assistant
         response = send_request(
             model, 
             api_key, 
@@ -126,6 +125,7 @@ def main():
         print("Assistant message:", assistant_message)
         # save_message(assistant_message, 'assistant')
         prompt.append({"role": "system", "content": assistant_message})
+        assistant_message = json.loads(assistant_message)
 
     channel.close()
     client.close()
