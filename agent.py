@@ -45,6 +45,23 @@ def save_message(prompt):
     with open(filename, 'w') as f:
         f.write(prompt)
 
+
+def parse_json_input(assistant_message):
+    # Check and remove code block formatting if present
+    if assistant_message.startswith("```json") and assistant_message.endswith("```"):
+        print("Code block formatting detected.")
+        # Removing the first 7 characters (```json\n) and the last 3 characters (```)
+        assistant_message = assistant_message[7:-3].strip()
+
+    # Parse the JSON string
+    try:
+        parsed_json = json.loads(assistant_message)
+        return parsed_json
+    except json.JSONDecodeError:
+        # Handle the case where the string is not valid JSON
+        return None
+    
+
 def main():
     # Read config from json
     if len(sys.argv) > 1:
@@ -125,7 +142,8 @@ def main():
         print("Assistant message:", assistant_message)
         # save_message(assistant_message, 'assistant')
         prompt.append({"role": "system", "content": assistant_message})
-        assistant_message = json.loads(assistant_message)
+        # assistant_message = json.loads(assistant_message)
+        assistant_message = parse_json_input(assistant_message)
 
     channel.close()
     client.close()
