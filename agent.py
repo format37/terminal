@@ -54,12 +54,40 @@ def parse_json_input(assistant_message):
         assistant_message = assistant_message[7:-3].strip()
 
     # Parse the JSON string
-    try:
-        parsed_json = json.loads(assistant_message)
-        return parsed_json
-    except json.JSONDecodeError:
+    # try:
+    parsed_json = json.loads(assistant_message)
+    return parsed_json
+    """except json.JSONDecodeError:
         # Handle the case where the string is not valid JSON
-        return None
+        return assistant_message"""
+    
+def extract_and_merge_codeblocks(message):
+    """
+    Extracts and merges all code blocks from the given message.
+
+    Args:
+    message (str): The message containing code blocks.
+
+    Returns:
+    tuple: A tuple containing the message text and the merged code text.
+    """
+    # Splitting the message using triple backticks as the delimiter
+    parts = message.split("```")
+
+    # Initializing variables to hold message text and code text
+    message_text = ""
+    code_text = ""
+
+    # Iterating over the parts to separate message text and code text
+    for i, part in enumerate(parts):
+        if i % 2 == 0:
+            # Even index parts are message text
+            message_text += part
+        else:
+            # Odd index parts are code blocks
+            code_text += part + "\n"  # Adding a newline for separation between code blocks
+
+    return message_text.strip(), code_text.strip()
     
 
 def main():
@@ -107,13 +135,17 @@ def main():
     system_text += f"\nuser password: {password}"
 
     prompt = [
-        {"role": "system", "content": system_text}
+        {"role": "system", "content": system_text},
+        {"role": "user", "content": "Let's connect to the server and check the date."}
     ]
 
-    assistant_message = "user:"
+    assistant_message = {
+        "message": "",
+        "command": "date"
+    }
 
     while True:
-        if 'command' in assistant_message:
+        if assistant_message['command'] != "":
             command = assistant_message['command']
             if command.lower() == 'exit':
                 ssh_response = "Session closed."
@@ -127,6 +159,9 @@ def main():
             prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
         else:
             user_text = input("Enter your message: ")
+            if user_text.lower() == 'exit':
+                ssh_response = "Session closed."
+                break
             prompt.append({"role": "user", "content": user_text})
 
         # Calling assistant
@@ -143,7 +178,19 @@ def main():
         # save_message(assistant_message, 'assistant')
         prompt.append({"role": "system", "content": assistant_message})
         # assistant_message = json.loads(assistant_message)
-        assistant_message = parse_json_input(assistant_message)
+        try:
+            text_block, code_block = extract_and_merge_codeblocks(assistant_message)
+            assistant_message = {
+                "message": text_block,
+                "command": code_block
+            }
+            # print("Assistant blocks:", assistant_message)
+        except Exception as e:
+            print("Unable to parse codeblocks")
+            assistant_message = {
+                "message": assistant_message,
+                "command": ""
+            }
 
     channel.close()
     client.close()
