@@ -35,4 +35,4 @@ Then run:
 python3 agent.py
 ```
 ### Sample
-[![IMAGE ALT TEXT HERE](assets/youtube.png)](https://youtu.be/n8_WRD7Ulg8?si=lAINq1mJ3ClhK4Vh)
+[![IMAGE ALT TEXT HERE](assets/youtube_0.png)](https://youtu.be/n8_WRD7Ulg8?si=lAINq1mJ3ClhK4Vh)
