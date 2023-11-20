@@ -1,7 +1,7 @@
-## Terminal gpt agent
-Authonomous GPT agent can take commands from user and execute them on the remote machine by ssh.  
+## Terminal GPT agent
+An autonomous GPT agent can take commands from a user and execute them on the remote machine by ssh.  
 ![image](assets/terminal_agent.png)  
-A multiple ssh calls from agent are available without interaction with user.
+Multiple subsequent ssh calls from the agent are available without interaction with the user.
 ### Install sshd
 ```
 sudo apt install openssh-server
