@@ -2,6 +2,10 @@
 An autonomous GPT agent can take commands from a user and execute them on the remote machine by ssh.  
 ![image](assets/terminal_agent.png)  
 Multiple subsequent ssh calls from the agent are available without interaction with the user.
+### Requirements
+* Linux
+* OpenAI api key
+* [openai_proxy](https://github.com/format37/openai_proxy), which can be exclude with rewriting the script.
 ### Install sshd
 ```
 sudo apt install openssh-server
