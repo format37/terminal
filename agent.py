@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import paramiko
 import time
 import requests
@@ -113,11 +115,11 @@ def main():
     client.connect(hostname, port, username, password)
     channel = client.invoke_shell()
 
-    def send_command(cmd, config):
+    def send_command(cmd, config, timeout=0.1):
         channel.send(cmd + '\n')
         time.sleep(config['ssh']['sleep'])
         while not channel.recv_ready():
-            time.sleep(0.1)
+            time.sleep(timeout)
         return channel.recv(4096).decode('utf-8')
 
     def send_interrupt():
@@ -139,10 +141,41 @@ def main():
         {"role": "user", "content": "Let's connect to the server and check the date."}
     ]
 
+    init_messages = []
+
+    assistant_message = """Connecting to the server.
+    ```:```"""
+    init_messages.append (assistant_message)
+    
+    assistant_message = """Let's start from taking the sudo previleges.
+    ```sudo date```"""
+    init_messages.append (assistant_message)
+
+    assistant_message = f"""Inputing the password.
+    ```{config['ssh']['password']}```"""
+    init_messages.append (assistant_message)
+
+    for message in init_messages:
+        prompt.append({"role": "assistant", "content": message})
+        print("+ Assistant message:", message)
+        # assistant_message = extract_and_merge_codeblocks(message)
+        text_block, code_block = extract_and_merge_codeblocks(message)
+        # command = assistant_message['command']
+        ssh_response = send_command(code_block, config, 3)
+        print(f'bash: {ssh_response}')
+        prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
+        # print("+ User content:", f"bash: {ssh_response}")
+        print(f"+ User content: bash: {ssh_response}")
+
+    message = "Root access granted. How can I help you?"
+    prompt.append({"role": "assistant", "content": message})
     assistant_message = {
-        "message": "",
-        "command": "date"
+        "message": message,
+        "command": ""
     }
+    print("Assistant message:", assistant_message)
+
+    print('=== prompt:', prompt)
 
     while True:
         if assistant_message['command'] != "":
@@ -173,10 +206,15 @@ def main():
             prompt
             )
         response_json = json.loads(response.json())
-        assistant_message = response_json['choices'][0]['message']['content']
+        try:
+            assistant_message = response_json['choices'][0]['message']['content']
+        except Exception as e:
+            print("Error parsing assistant message:", e)
+            print("Response text:", response.text)
+            raise
         print("Assistant message:", assistant_message)
         # save_message(assistant_message, 'assistant')
-        prompt.append({"role": "system", "content": assistant_message})
+        prompt.append({"role": "assistant", "content": assistant_message})
         # assistant_message = json.loads(assistant_message)
         try:
             text_block, code_block = extract_and_merge_codeblocks(assistant_message)
