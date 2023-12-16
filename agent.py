@@ -1,41 +1,36 @@
 # -*- coding: utf-8 -*-
-
 import paramiko
 import time
-import requests
 import json
 import datetime
 import os
 import sys
-
-def token_counter(text, model, address, port):
-    url = f'http://{address}:{port}/token_counter'
-    data = {
-        "text": text,
-        "model": model
-    }
-    # print('Token counter data:', data)
-    response = requests.post(url, json=data)
-    return response
+import tiktoken
+from openai import OpenAI
+import re
 
 
-def send_request(model, api_key, address, port, prompt):
-    url = f'http://{address}:{port}/request'
-    request_data = {
-        "api_key": api_key,
-        "model": model,
-        "prompt": prompt
-    }
-    # Json dumps prompt
-    prompt_dumped = json.dumps(prompt)
-    print(
-        'Token count forecast:', 
-        token_counter(prompt_dumped, model, address, port).json()['tokens']
+def token_counter(text, model):
+    try:        
+        enc = tiktoken.encoding_for_model(model) 
+        tokens = enc.encode(text)
+    except Exception as e:
+        return str(e)
+    return len(tokens)
+
+
+def text_chat_gpt(api_key, model, messages, temperature=0.9):
+    try:
+        client = OpenAI(api_key=api_key)
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model=model,
         )
-    save_message(prompt_dumped)
-    response = requests.post(url, json=request_data)
-    return response
-
+        return chat_completion
+    
+    except Exception as e:
+        return str(e)
+    
 
 def save_message(prompt):
     folder = 'memory/'
@@ -47,21 +42,6 @@ def save_message(prompt):
     with open(filename, 'w') as f:
         f.write(prompt)
 
-
-def parse_json_input(assistant_message):
-    # Check and remove code block formatting if present
-    if assistant_message.startswith("```json") and assistant_message.endswith("```"):
-        print("Code block formatting detected.")
-        # Removing the first 7 characters (```json\n) and the last 3 characters (```)
-        assistant_message = assistant_message[7:-3].strip()
-
-    # Parse the JSON string
-    # try:
-    parsed_json = json.loads(assistant_message)
-    return parsed_json
-    """except json.JSONDecodeError:
-        # Handle the case where the string is not valid JSON
-        return assistant_message"""
     
 def extract_and_merge_codeblocks(message):
     """
@@ -90,6 +70,50 @@ def extract_and_merge_codeblocks(message):
             code_text += part + "\n"  # Adding a newline for separation between code blocks
 
     return message_text.strip(), code_text.strip()
+
+
+def extract_prompt_identifier(ssh_response):
+    last_line = ssh_response.splitlines()[-1].strip()
+    match = re.search(r'\S+@\S+(?=\s|:)', last_line)
+    if match:
+        return match.group()
+    else:
+        return None
+    
+
+def send_command(channel, cmd, config, timeout=0.1):
+        channel.send(cmd + '\n')
+        time.sleep(config['ssh']['sleep'])
+        while not channel.recv_ready():
+            time.sleep(timeout)
+        return channel.recv(4096).decode('utf-8')
+    
+
+def send_command_and_wait(channel, cmd, ssh_prompt):
+    # Send the command to the channel
+    channel.send(cmd + '\n')
+    
+    # Buffer to store the received data
+    output_buffer = ""
+    
+    # Wait for the command to complete (i.e., the prompt to reappear)
+    while not ssh_prompt in output_buffer:
+        # Check if the channel received data
+        if channel.recv_ready():
+            # Receive data and decode it
+            output = channel.recv(4096).decode('utf-8')
+            output_buffer += output
+        else:
+            # Wait before checking again
+            print("Waiting for the server to respond. output_buffer:", output_buffer)
+            time.sleep(1)
+
+    return output_buffer
+
+
+def send_interrupt(channel):
+    channel.send(chr(0x03))  # Sending Ctrl-C
+    time.sleep(1)
     
 
 def main():
@@ -115,19 +139,8 @@ def main():
     client.connect(hostname, port, username, password)
     channel = client.invoke_shell()
 
-    def send_command(cmd, config, timeout=0.1):
-        channel.send(cmd + '\n')
-        time.sleep(config['ssh']['sleep'])
-        while not channel.recv_ready():
-            time.sleep(timeout)
-        return channel.recv(4096).decode('utf-8')
+    
 
-    def send_interrupt():
-        channel.send(chr(0x03))  # Sending Ctrl-C
-        time.sleep(1)
-
-    openai_proxy_address = config['openai']['proxy']['address']
-    openai_proxy_port = config['openai']['proxy']['port']
     api_key = config['openai']['api_key']
     model = config['openai']['model']
     # Read system text from txt file
@@ -158,13 +171,10 @@ def main():
     for message in init_messages:
         prompt.append({"role": "assistant", "content": message})
         print("+ Assistant message:", message)
-        # assistant_message = extract_and_merge_codeblocks(message)
         text_block, code_block = extract_and_merge_codeblocks(message)
-        # command = assistant_message['command']
-        ssh_response = send_command(code_block, config, 3)
+        ssh_response = send_command(channel, code_block, config, 3)
         print(f'bash: {ssh_response}')
         prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
-        # print("+ User content:", f"bash: {ssh_response}")
         print(f"+ User content: bash: {ssh_response}")
 
     message = "Root access granted. How can I help you?"
@@ -177,6 +187,9 @@ def main():
 
     print('=== prompt:', prompt)
 
+    # Determine the current ssh identifier
+    ssh_id = extract_prompt_identifier(ssh_response)
+
     while True:
         if assistant_message['command'] != "":
             command = assistant_message['command']
@@ -187,7 +200,8 @@ def main():
                 send_interrupt()
                 ssh_response = "Command interrupted."
             else:
-                ssh_response = send_command(command, config)
+                # ssh_response = send_command(channel, command, config)
+                ssh_response = send_command_and_wait(channel, code_block, ssh_id)
             print(f'bash: {ssh_response}')
             prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
         else:
@@ -197,25 +211,26 @@ def main():
                 break
             prompt.append({"role": "user", "content": user_text})
 
+        # Calculating the token count forecast
+        token_count = token_counter(str(prompt), model)
+        print("Tokens forecast:", token_count)
+
         # Calling assistant
-        response = send_request(
-            model, 
-            api_key, 
-            openai_proxy_address, 
-            openai_proxy_port, 
-            prompt
-            )
+        response = text_chat_gpt(api_key, model, prompt, config['openai']['temperature'])
         response_json = json.loads(response.json())
         try:
             assistant_message = response_json['choices'][0]['message']['content']
+            # Print total tokens used
+            print("Tokens used:", response_json['usage']['total_tokens'])
         except Exception as e:
             print("Error parsing assistant message:", e)
-            print("Response text:", response.text)
+            print("Response text:", response_json)
             raise
         print("Assistant message:", assistant_message)
         # save_message(assistant_message, 'assistant')
         prompt.append({"role": "assistant", "content": assistant_message})
         # assistant_message = json.loads(assistant_message)
+        save_message(str(prompt))
         try:
             text_block, code_block = extract_and_merge_codeblocks(assistant_message)
             assistant_message = {
