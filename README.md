@@ -26,13 +26,8 @@ python3 ssh.py
 ```
 ## Caution!
 Your agent knows your login and password and can hurt your system!  
-To hide the login and password, disable these lines:
-```
-system_text += f"\nuser login: {username}"
-system_text += f"\nuser password: {password}"
-```
 ### Run agent
-Configure your agent in config.py  
+Configure your agent in config.json  
 Then run:
 ```
 python3 agent.py
