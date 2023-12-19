@@ -5,7 +5,6 @@ Multiple subsequent ssh calls from the agent are available without interaction w
 ### Requirements
 * Linux
 * OpenAI api key
-* [openai_proxy](https://github.com/format37/openai_proxy), which can be exclude with rewriting the script.
 ### Install sshd
 ```
 sudo apt install openssh-server
