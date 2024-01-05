@@ -11,6 +11,13 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import TextLoader
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import DocArrayInMemorySearch
+from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import MessagesPlaceholder
+from langchain.chains import create_history_aware_retriever
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 import re
 
 
@@ -154,13 +161,42 @@ def main():
     client.connect(hostname, port, username, password)
     channel = client.invoke_shell()
 
-    api_key = config['openai']['api_key']
-    model = config['openai']['model']
+    # api_key = config['openai']['api_key']
+    # model = config['openai']['model']
     # Read system text from txt file
     with open('system.txt', 'r') as f:
         system_text = f.read()
     system_text += f"\nuser login: {username}"
     system_text += f"\nuser password: {password}"
+
+    
+    # Initializing retrieval chain
+    context_path = config['context']['path']
+    # Read files in context_path folder
+    loader = TextLoader(context_path, encoding = 'UTF-8')
+    docs = loader.load()
+    embeddings = OpenAIEmbeddings(openai_api_key=config['openai']['api_key'])
+    text_splitter = RecursiveCharacterTextSplitter()
+    documents = text_splitter.split_documents(docs)
+    # Print documents
+    print("Documents:")
+    for doc_element in documents:
+        print(doc_element)
+    vector = DocArrayInMemorySearch.from_documents(documents, embeddings)
+
+    """prompt = ChatPromptTemplate.from_messages([
+        ("system", system_text + "\nAdditional context:\n\n{context}"),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("user", "{input}"),
+    ])"""
+    prompt = ChatPromptTemplate.from_messages([
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("user", "{input}"),
+        ("user", "Given the above conversation, provide reaction that is relevant to the conversation")
+    ])
+    retriever = vector.as_retriever()
+    retriever_chain = create_history_aware_retriever(chat, retriever, prompt)
+
 
     init_messages = []
 
@@ -202,6 +238,7 @@ def main():
     ssh_id = extract_prompt_identifier(ssh_response)
 
     while True:
+        user_input = ""
         if assistant_message['command'] != "":
             command = assistant_message['command']
             if command.lower() == 'exit':
@@ -215,14 +252,16 @@ def main():
                 ssh_response = send_command_and_wait(channel, code_block, ssh_id)
             print(f'bash: {ssh_response}')
             # prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
-            messages.append(HumanMessage(content=f"bash: {ssh_response}"))
+            # messages.append(HumanMessage(content=f"bash: {ssh_response}"))
+            user_input = f"bash: {ssh_response}"
         else:
             user_text = input("Enter your message: ")
             if user_text.lower() == 'exit':
                 ssh_response = "Session closed."
                 break
             # prompt.append({"role": "user", "content": user_text})
-            messages.append(HumanMessage(content=user_text))
+            # messages.append(HumanMessage(content=user_text))
+            user_input = user_text
 
         # Calculating the token count forecast
         
@@ -230,8 +269,25 @@ def main():
         # print("Tokens forecast:", token_count)
 
         # Calling assistant
-        response = str(chat(messages))
-        
+        # response = str(chat(messages))
+        """response = str(retriever_chain.invoke({
+            "chat_history": messages,
+            "input": user_text
+        }))"""
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "React user's messages, accounting the below context:\n\n{context}"),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("user", "{input}"),
+        ])
+        document_chain = create_stuff_documents_chain(chat, prompt)
+        retrieval_chain = create_retrieval_chain(retriever_chain, document_chain)
+        response = str(retrieval_chain.invoke({
+            "chat_history": messages,
+            "input": user_input
+        })['answer'])
+
+        messages.append(HumanMessage(content=user_input)) # last user input
+
         print("response original:", response)
         messages.append(AIMessage(content=response))
         save_message(str(messages))
