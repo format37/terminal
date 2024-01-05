@@ -9,6 +9,8 @@ import tiktoken
 # from openai import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import TextLoader
 import re
 
 
@@ -229,6 +231,7 @@ def main():
 
         # Calling assistant
         response = str(chat(messages))
+        
         print("response original:", response)
         messages.append(AIMessage(content=response))
         save_message(str(messages))
