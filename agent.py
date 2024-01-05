@@ -10,7 +10,7 @@ import tiktoken
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import TextLoader
+from langchain.document_loaders import TextLoader, DirectoryLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import DocArrayInMemorySearch
 from langchain.prompts import ChatPromptTemplate
@@ -19,7 +19,21 @@ from langchain.chains import create_history_aware_retriever
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 import re
+from pathlib import Path
 
+
+"""def load_files_from_directory(directory_path):
+    # loader = TextLoader(encoding='UTF-8')
+    documents = []
+
+    # Looping through each file in the directory
+    for filepath in Path(directory_path).glob('*.txt'):
+        # Load the content of each file
+        file_docs = loader.load(filepath)
+        documents.extend(file_docs)
+
+    return documents
+"""
 
 def token_counter(text, model):
     try:        
@@ -161,8 +175,6 @@ def main():
     client.connect(hostname, port, username, password)
     channel = client.invoke_shell()
 
-    # api_key = config['openai']['api_key']
-    # model = config['openai']['model']
     # Read system text from txt file
     with open('system.txt', 'r') as f:
         system_text = f.read()
@@ -173,13 +185,18 @@ def main():
     # Initializing retrieval chain
     context_path = config['context']['path']
     # Read files in context_path folder
-    loader = TextLoader(context_path, encoding = 'UTF-8')
+    # loader = TextLoader(context_path, encoding = 'UTF-8')
+    # docs = loader.load()
+    # Load documents from all files in the context_path folder
+    # docs = load_files_from_directory(context_path)
+    loader = DirectoryLoader(context_path, glob="*", loader_cls=TextLoader)
     docs = loader.load()
+
     embeddings = OpenAIEmbeddings(openai_api_key=config['openai']['api_key'])
     text_splitter = RecursiveCharacterTextSplitter()
     documents = text_splitter.split_documents(docs)
     # Print documents
-    print("Documents:")
+    print(f"Documents: {len(documents)}")
     for doc_element in documents:
         print(doc_element)
     vector = DocArrayInMemorySearch.from_documents(documents, embeddings)
@@ -251,16 +268,12 @@ def main():
                 # ssh_response = send_command(channel, command, config)
                 ssh_response = send_command_and_wait(channel, code_block, ssh_id)
             print(f'bash: {ssh_response}')
-            # prompt.append({"role": "user", "content": f"bash: {ssh_response}"})
-            # messages.append(HumanMessage(content=f"bash: {ssh_response}"))
             user_input = f"bash: {ssh_response}"
         else:
             user_text = input("Enter your message: ")
-            if user_text.lower() == 'exit':
+            if user_text.lower() == 'exit' or user_text.lower() == 'quit':
                 ssh_response = "Session closed."
                 break
-            # prompt.append({"role": "user", "content": user_text})
-            # messages.append(HumanMessage(content=user_text))
             user_input = user_text
 
         # Calculating the token count forecast
@@ -270,10 +283,6 @@ def main():
 
         # Calling assistant
         # response = str(chat(messages))
-        """response = str(retriever_chain.invoke({
-            "chat_history": messages,
-            "input": user_text
-        }))"""
         prompt = ChatPromptTemplate.from_messages([
             ("system", "React user's messages, accounting the below context:\n\n{context}"),
             MessagesPlaceholder(variable_name="chat_history"),
