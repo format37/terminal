@@ -74,6 +74,7 @@ class ChatAgent:
             if user_input.lower() in ['exit', 'quit']:
                 break
             self.agent.run(input=user_input, chat_history=chat_history)
+            print('Chat history length: ', len(chat_history))
 
 
 class DocumentInput(BaseModel):
