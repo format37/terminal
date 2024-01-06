@@ -11,6 +11,7 @@ from langchain.document_loaders import TextLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import DocArrayInMemorySearch
 from langchain.tools import ShellTool, DuckDuckGoSearchRun
+from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
 
 class ConfigLoader:
@@ -73,8 +74,14 @@ class ChatAgent:
             user_input = input("You: ")
             if user_input.lower() in ['exit', 'quit']:
                 break
-            self.agent.run(input=user_input, chat_history=chat_history)
-            print('Chat history length: ', len(chat_history))
+            
+            # Update the chat history with the User input
+            chat_history.append(HumanMessage(content=user_input))
+
+            response = self.agent.run(input=user_input, chat_history=chat_history)
+            
+            # Update the chat history with the Agent response
+            chat_history.append(AIMessage(content=response))
 
 
 class DocumentInput(BaseModel):
