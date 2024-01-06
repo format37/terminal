@@ -54,7 +54,10 @@ class ChatAgent:
             model=self.config['openai']['model'],
             temperature=self.config['openai']['temperature']
         )
-
+        shell_tool = ShellTool()
+        shell_tool.description = shell_tool.description + f"args {shell_tool.args}".replace(
+            "{", "{{"
+        ).replace("}", "}}")
         tools = [
             Tool(
                 args_schema=DocumentInput,
@@ -62,7 +65,7 @@ class ChatAgent:
                 description="Additional context that has been provided by user",
                 func=RetrievalQA.from_chain_type(llm=llm, retriever=self.retriever),
             ),
-            ShellTool(),
+            shell_tool,
             DuckDuckGoSearchRun()
         ]
 
