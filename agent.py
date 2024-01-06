@@ -17,6 +17,8 @@ class ConfigLoader:
     def __init__(self, config_filename='config.json'):
         self.config_filename = config_filename
         self.config = self.load_config()
+        if self.config['openai']['api_key']=='':
+            self.config['openai']['api_key']=input("Please enter your OpenAI API key: ")
 
     def load_config(self):
         with open(self.config_filename, 'r') as file:
