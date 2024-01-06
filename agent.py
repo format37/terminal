@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import sys
 import warnings
@@ -70,6 +71,9 @@ class ChatAgent:
 
     def run(self):
         chat_history = []
+        # Add a system message to the chat history
+        system_message = 'You are a chatbot, that can run tools. Please be confident. Try to solve task until you solve it or you are stuck.'
+        chat_history.append(SystemMessage(content=system_message))
         while True:
             user_input = input("You: ")
             if user_input.lower() in ['exit', 'quit']:

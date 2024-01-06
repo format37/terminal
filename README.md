@@ -2,7 +2,7 @@
 including tools:
 * Shell (bash)
 * DuckDuckGo Search
-* Retrieval
+* Retrieval  
 ![image](assets/reason-plus-action-react-framework.png)  
 ### Requirements
 * Linux
