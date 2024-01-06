@@ -11,7 +11,7 @@ from langchain_community.embeddings.openai import OpenAIEmbeddings
 from langchain.document_loaders import TextLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import DocArrayInMemorySearch
-from langchain.tools import ShellTool, DuckDuckGoSearchRun
+from langchain_community.tools import ShellTool, DuckDuckGoSearchRun
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
 
